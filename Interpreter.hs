@@ -18,6 +18,7 @@ import Control.Monad.Error
 import Control.Monad.State
 import System.Environment
 import Semantic
+import StateEnv
 import Text.Show
 
 
@@ -29,7 +30,7 @@ main = do
     [] -> getContents
   case pProgram (myLexer input) of
     (Ok s) -> do
-        result <- runExceptT (runStateT (runReaderT (runProgram s) emptyEnv) initialStore)
+        result <- runExceptT (runStateT (runReaderT (runProgram s) initialEnv) initialStore)
         case result of
           (Left e) -> putStrLn e
           (Right e) -> putStrLn (show e)

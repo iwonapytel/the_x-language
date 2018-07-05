@@ -3,6 +3,7 @@ module Semantic where
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Except
+import Control.Monad.IO.Class
 import Text.Show
 import Debug.Trace
 import Data.Map as Map
@@ -11,195 +12,141 @@ import AbsGrammar
 import LexGrammar
 import ParGrammar
 import PrintGrammar
+import StateEnv
+import Expressions
 
-type Result = ExceptT String IO
-type Semantics = ReaderT Env (StateT Store (Result))
-
-type Var = Ident
-type FuncId = Ident
-type Loc = Int
-data Val = INT Int | BOOL Bool deriving (Eq, Show, Ord)
-
-type Store = Map Loc Val
-type Env = Map Var Loc
-
--- Initial states
-emptyEnv :: Env
-emptyEnv = Map.empty
-
-initialStore :: Store
-initialStore = Map.singleton (0) (INT 1)
-
-findLoc :: Ident -> Semantics Loc
-findLoc ident = do
-  env <- ask
-  let loc = Map.lookup ident env
-  case loc of
-    Just loc -> return loc
-    Nothing -> throwError "Undeclared var"
-
-setLocVal :: Loc -> Val -> Semantics ()
-setLocVal loc val = do
-  modify (Map.insert loc val)
-
-setVarVal :: Ident -> Val -> Semantics ()
-setVarVal ident val = do
-  loc <- findLoc ident
-  setLocVal loc val
-
-getLocVal :: Loc -> Semantics Val
-getLocVal loc = do--
-  Just val <- gets (Map.lookup loc)
-  return val
-
-getVarVal :: Ident -> Semantics Val
-getVarVal ident = do
-  loc <- findLoc ident
-  val <- getLocVal loc
-  return val
-
-varDecl :: Ident -> (Maybe Val) -> Semantics Env
-varDecl ident val = do
-  env <- ask
-  if (Map.member ident env) then
-    throwError "Muplitple declarations of same ident"
-  else do
-    loc <- case val of
-      Just val -> newLoc val
-      Nothing -> newLoc (INT 0)
-    return (Map.insert ident loc env)
-
-newLoc :: Val -> Semantics Loc
-newLoc val = do
-  Just (INT loc) <- gets (Map.lookup 0)
-  modify (Map.insert loc val)
-  modify (Map.insert 0 (INT (loc + 1)))
-  return loc
-
---- Expressions semantics
-
-semBinExp :: Exp -> Exp -> Semantics (Val, Val)
-semBinExp e1 e2 = do
-  _e1 <- semExp e1
-  _e2 <- semExp e2
-  return(_e1, _e2)
-
-semBinIntExp :: Exp -> Exp -> Semantics (Int, Int)
-semBinIntExp e1 e2 = do
-  (_e1, _e2) <- semBinExp e1 e2
-  case (_e1, _e2) of
-    (INT a, INT b) -> return (a, b)
-    _ -> throwError "Incompatible types for arithmetic expression"
-
-semBinBoolExp :: Exp -> Exp -> Semantics (Bool, Bool)
-semBinBoolExp b1 b2 = do
-  (_b1, _b2) <- semBinExp b1 b2
-  case (_b1, _b2) of
-    (BOOL a, BOOL b) -> return (a, b)
-    _ -> throwError "Incompatible types for boolean expression"
-
-
-
-
-semExp :: Exp -> Semantics Val
-semExp ex = do
-  case ex of
-    (ELitInt i)         -> return (INT (fromInteger i))
-    (ELitBool b)        -> case b of
-                            ETrue ->  return (BOOL True)
-                            EFalse -> return (BOOL False)
-    (EVar ident)        -> getVarVal ident
-    (Elor exp1 exp2)    -> do
-           (e1, e2) <- semBinBoolExp exp1 exp2
-           return $ BOOL (e1 || e2)
-    (Eland exp1 exp2) -> do
-          (a, b) <- semBinBoolExp exp1 exp2
-          return $ BOOL (a && b)
-    (Eeq exp1 exp2) -> do
-           (a, b) <- semBinExp exp1 exp2
-           return $ BOOL $ a == b
-    (Eneq exp1 exp2) -> do
-           BOOL a <- semExp (Eeq exp1 exp2)
-           return $ BOOL $ not a
-    (Elthen exp1 exp2) -> do
-           (a, b) <- semBinExp exp1 exp2
-           return $ BOOL $ a < b
-    (Egrthen exp1 exp2) -> do
-          (a, b) <- semBinExp exp1 exp2
-          return $ BOOL $ a > b
-    (Ele exp1 exp2) -> do
-          (a, b) <- semBinExp exp1 exp2
-          return $ BOOL $ a <= b
-    (Ege exp1 exp2) -> do
-          (a, b) <- semBinExp exp1 exp2
-          return $ BOOL $ a >= b
-    (Eplus exp1 exp2) -> do
-          pair <- semBinExp exp1 exp2
-          case pair of
-            (INT a, INT b) -> return $ INT $ a + b
-            --(STRING a, STRING b) -> return $ STRING $ a ++ b
-            _ -> throwError "Cannot use + operator on given types"
-    (Eminus exp1 exp2) -> do
-          (a, b) <- semBinIntExp exp1 exp2
-          return $ INT $ a - b
-    (Etimes exp1 exp2) -> do
-          (a, b) <- semBinIntExp exp1 exp2
-          return $ INT $ a * b
-    (Ediv exp1 exp2) -> do
-          (a, b) <- semBinIntExp exp1 exp2
-          if (b == 0) then throwError "Division by zero"
-          else return $ INT $ div a b
-    --(Epreop unary_operator exp) -> do
-    --      a <- transExp exp
-    --      transUnary_operator unary_operator a
-    _      -> throwError "Unsupported expression type"
 
 -- todo tutaj zrób jumpy
-semInstructions :: [Instruction] -> Semantics Env
+semInstructions :: [Instruction] -> Semantics (Env, Ret)
 semInstructions (x:xs) = do
   traceShowM x
-  env <- semInstruction x
-  local (const env) (semInstructions xs)
+  (env, ret) <- semInstruction x
+  case ret of
+    None -> local (const env) (semInstructions xs)
+    _ -> return (env, ret)
 
 semInstructions [] = do
   env <- ask
-  return env
+  return (env, None)
 
-semInstruction :: Instruction -> Semantics Env
+semInstruction :: Instruction -> Semantics (Env, Ret)
 semInstruction i = do
   env <- ask
   case i of
     StmInstruction s -> do
-      semStatement s
-      return env
+      ret <- semStatement s
+      return (env, ret)
     DecInstruction d -> do
       env2 <- semDeclaration d
-      return env2
+      return (env2, None)
     ExpInstruction e -> do
       val <- semExp e
       traceShowM val
-      return env
+      return (env, None)
+    BlockInstruction b -> do
+      case b of
+        BBlock i -> do
+          (env2, ret) <- semInstructions i
+          return (env, ret)
+        EmptyBlock -> return (env, None)
+
 
 -- Statements semantic
-semStatement :: Stm -> Semantics ()
-semStatement stm =
-  return ()
-{-
-semEmptyStm :: Stm -> Semantics ()
-semBlockStm :: Stm -> Semantics ()
-semExpStm :: Stm -> Semantics ()
-semPrintStm :: Stm -> Semantics ()
-semSelectStm :: Stm -> Semantics ()
--}
+semStatement :: Stm -> Semantics Ret
+semStatement stm = case stm of
+    EmptyStm   -> return None
+    PrintStm x -> semPrintStm x
+    SelectStm x -> case x of
+      IfStm e i       -> semIfElseStm e i (StmInstruction EmptyStm)
+      IfElseStm e i1 i2 -> semIfElseStm e i1 i2
+
+semPrintStm :: Exp -> Semantics Ret
+semPrintStm expr = do
+    eval <- semExp expr
+    printVal eval
+    return None
+
+printVal :: Val -> Semantics ()
+printVal val = case val of
+  (INT i)  -> liftIO (print i)
+  (BOOL i) -> liftIO (print i)
+
+semIfElseStm :: Exp -> Instruction -> Instruction -> Semantics Ret
+semIfElseStm e i1 i2 = do
+  val <- semExp e
+  cond <- valToCondition val
+  (_, ret) <- if cond then semInstruction i1
+              else semInstruction i2
+  return ret
+
+semWhileStm :: Exp -> Instruction -> Semantics Ret
+semWhileStm e i = do
+  val <- semExp e
+  cond <- valToCondition val
+  if not cond then return None
+  else do
+    (_, ret) <- semInstruction i
+    case ret of
+      Break ->  return None
+      Return v ->  return ret
+      _ ->  do
+        ret2 <- (semWhileStm e i)
+        return ret2
+
+valToCondition :: Val -> Semantics Bool
+valToCondition val = do
+  case val of
+   (BOOL b) -> return b
+   (INT 0)  -> return False
+   (INT _)  -> return True
+   _        -> throwError "Unsupported condition type"
+
 -- Declarations semantics
 semDeclaration :: Dec -> Semantics Env
 semDeclaration dec = do
-  env <- ask
-  return env
+  case dec of
+    VarDec typename item -> semVarDec typename item
+
+semVarDec :: TypeName ->  Item -> Semantics Env
+semVarDec typename item = do
+  case item of
+    UninitedVar ident    -> varDecl ident (defaultTypeValue typename)
+    InitedVar ident expr -> do
+      val <- semExp expr
+      if not (checkTypeVal typename val) then
+        throwError "Incompatible value type for given type identifier"
+      else
+        varDecl ident val
+    UninitedArr ident arrsize -> case arrsize of
+      ValArrSize det -> do
+        detVal <- semExp det
+        case detVal of
+          (INT i) -> do
+            let defaultVals = (replicate i (INT 0))
+            putArray ident detVal defaultVals
+          _ -> throwError "Incompatible array size"
+      EmptyArrSize -> do
+        varDecl ident (ARR 0 Map.empty)
+    InitedArr ident arrsize (Earray expr) -> do
+      vals <- semMultipleVals expr
+      _ <- checkArrVals typename vals
+      case arrsize of
+        ValArrSize det -> do
+          detVal <- semExp det
+          putArray ident detVal vals
+        EmptyArrSize ->
+          putArray ident (INT $ length vals) vals
+
+
+
+-- replicate problem
+--
+
 {-
-semVarDec :: Dec -> Semantics Env
 semFunDec :: Dec -> Semantics Env
 -}
+
+-- main
 runProgram :: Program -> Semantics Env
 runProgram program = do
   state <- get
@@ -209,5 +156,5 @@ runProgram program = do
 
 semProgram :: Program -> Semantics Env
 semProgram (Progr instructions) = do
-  env <- semInstructions instructions
+  (env, ret) <- semInstructions instructions
   return env

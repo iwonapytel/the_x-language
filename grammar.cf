@@ -15,6 +15,7 @@ Progr.  Program ::= [Instruction] ;
 StmInstruction.      Instruction ::= Stm ;
 ExpInstruction.      Instruction ::= Exp ";" ;
 DecInstruction.      Instruction ::= Dec ;
+BlockInstruction.    Instruction ::= Block ;
 
 BBlock. Block ::= "{" [Instruction] "}" ;
 EmptyBlock. Block ::= "{" "}" ;
@@ -30,14 +31,14 @@ separator nonempty TypeName ",";
 
 
 -- Declarations
-VarDec. Dec ::= TypeName [Item] ";" ;
+VarDec. Dec ::= TypeName Item ";" ;
 FuncDec. Dec ::= TypeName Func ;
 -- StructDec. Dec ::= Struct ";"
 
 UninitedVar.  Item ::= Ident ;
-UninitedArr.  Item ::= Ident [ArrSize] ;
-InitedVar.  Item ::= Ident "=" Initializer ;
-InitedArr.  Item ::= Ident [ArrSize] "=" Initializer ;
+UninitedArr.  Item ::= Ident ArrSize ;
+InitedVar.  Item ::= Ident "=" Exp ;
+InitedArr.  Item ::= Ident ArrSize "=" Exp ;
 separator nonempty Item "," ;
 
 SimpleArg. Arg ::= Ident ;
@@ -45,7 +46,7 @@ ArrArg.    Arg ::= Ident "[]" ;
 separator Arg "," ;
 
 ValArrSize.      ArrSize ::= "[" Exp "]" ;
-EmptyArrSize. ArrSize ::= "[]" ;
+EmptyArrSize.    ArrSize ::= "[]" ;
 
 separator nonempty ArrSize "" ;
 
@@ -63,31 +64,29 @@ separator Dec "" ;
 
 -- Statements
 EmptyStm.  Stm ::= ";" ;
-BlockStm.  Stm ::= Block ;
 -- DecStm. Stm ::= Dec ;
 SelectStm. Stm ::= SelectionStm ;
 ItStm.     Stm ::= IterStm ;
 JStm.      Stm ::= JumpStm ;
 PrintStm.  Stm ::= "print" "(" Exp ")" ";" ;
-AssignStm. Stm ::= Ident "=" Exp ";" ;
 
-IfStm.        SelectionStm ::= "if" "(" Exp ")" Stm ;
-IfElseStm.    SelectionStm ::= "if" "(" Exp ")" Stm "else" Stm ;
+IfStm.        SelectionStm ::= "if" "(" Exp ")" Instruction ;
+IfElseStm.    SelectionStm ::= "if" "(" Exp ")" Instruction "else" Instruction ;
 
-WhileStm.   IterStm ::= "while" "(" Exp ")" Stm;
-ForStm1. IterStm ::= "for" "(" Stm Exp ")" Stm ;
-ForStm2.  IterStm ::= "for" "(" Stm Exp Stm ")" Stm;
+WhileStm.   IterStm ::= "while" "(" Exp ")" Instruction;
+ForStm1.    IterStm ::= "for" "(" Stm Exp ")" Instruction ;
+ForStm2.    IterStm ::= "for" "(" Stm Exp Stm ")" Instruction;
 
--- GoToStm.   Jump_stm ::= "goto" Ident ";" ;
 ContStm.   JumpStm ::= "continue" ";" ;
-BreakStm. JumpStm ::= "break" ";" ;
-RetStm.  JumpStm ::= "return" ";" ;
-RetExpStm.  JumpStm ::= "return" Exp ";" ;
+BreakStm.  JumpStm ::= "break" ";" ;
+RetStm.    JumpStm ::= "return" ";" ;
+RetExpStm. JumpStm ::= "return" Exp ";" ;
 
 separator Stm "" ;
 
 -- Expressions
-Elor.        Exp  ::= Exp "||" Exp5;
+Easgn.       Exp   ::= Exp19 AsgnOp Exp;
+Elor.        Exp2  ::= Exp2 "||" Exp5;
 Eland.       Exp5  ::= Exp5 "&&" Exp6;
 Eeq.         Exp9  ::= Exp9 "==" Exp10;
 Eneq.        Exp9  ::= Exp9 "!=" Exp10;
@@ -99,22 +98,24 @@ Eplus.       Exp12 ::= Exp12 "+" Exp13;
 Eminus.      Exp12 ::= Exp12 "-" Exp13;
 Etimes.      Exp13 ::= Exp13 "*" Exp14;
 Ediv.        Exp13 ::= Exp13 "/" Exp14;
-Epreop.      Exp15 ::= UnaryOp Exp14;
+Epreop.      Exp14 ::= UnaryOp Exp14;
 
 Efunk.       Exp16 ::= Ident "(" ")";
 Efunkpar.    Exp16 ::= Ident "(" [Exp] ")";
 Earray.      Exp17 ::= "{" [Exp] "}";
-ELitBool.    Exp18 ::= EBool;
-ELitInt.     Exp18 ::= Integer;
-EString.     Exp18 ::= String;
-EVar.        Exp19 ::= Ident;
-EArr.        Exp19 ::= Ident [Exp];
+EPostInc.    Exp18 ::= Exp20 "++" ;
+EPostDec.    Exp18 ::= Exp20 "--" ;
+ELitBool.    Exp19 ::= EBool;
+ELitInt.     Exp19 ::= Integer;
+EString.     Exp19 ::= String;
+EVar.        Exp20 ::= Ident;
+EArr.        Exp20 ::= Ident "[" Exp "]";
 
 
 ETrue.  EBool ::= "true" ;
 EFalse. EBool ::= "false";
 
-coercions Exp 19 ;
+coercions Exp 20 ;
 separator Exp "," ;
 
 -- Operators
@@ -123,6 +124,12 @@ Indirection. UnaryOp ::= "*" ;
 UnaryPlus.   UnaryOp ::= "+" ;
 Negative.    UnaryOp ::= "-" ;
 Logicalneg.  UnaryOp ::= "!" ;
+
+Asgn.        AsgnOp ::= "=" ;
+AsgnAdd.     AsgnOp ::= "+=" ;
+AsgnSub.     AsgnOp ::= "-=" ;
+AsgnMul.     AsgnOp ::= "*=" ;
+AsgnDiv.     AsgnOp ::= "/=" ;
 
 -- Comments
 comment "/*" "*/" ;

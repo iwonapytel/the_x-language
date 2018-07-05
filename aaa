@@ -1,0 +1,22 @@
+2 + 2;
+2*2;
+2+2*2;
+2*2+2;
+1 < 2;
+print(2);
+1==2;
+if (1 == 2) print(2);
+int a;
+a = 1;
+int b = 1;
+bool c = true;
+{
+    int x = 42;
+}
+b += 1;
+b;
+int czdwa = 42;
+czdwa++;
+int arr[];
+int arr2[3];
+int arr3[1] = {1};
