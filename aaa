@@ -1,6 +1,6 @@
 2 + 2;
 2*2;
-2+2*2;
+(2+2)*2;
 2*2+2;
 1 < 2;
 print(2);
@@ -17,6 +17,11 @@ b += 1;
 b;
 int czdwa = 42;
 czdwa++;
-int arr[];
 int arr2[3];
 int arr3[1] = {1};
+arr3[0] = 2;
+print(arr3[0]);
+int cond;
+for (cond = 1; cond < 5; cond++) {
+    print(2);
+}

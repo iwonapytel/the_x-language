@@ -41,16 +41,18 @@ InitedVar.  Item ::= Ident "=" Exp ;
 InitedArr.  Item ::= Ident ArrSize "=" Exp ;
 separator nonempty Item "," ;
 
-SimpleArg. Arg ::= Ident ;
-ArrArg.    Arg ::= Ident "[]" ;
+SimpleArg. Arg ::= TypeName Ident ;
+ArrArg.    Arg ::= TypeName Ident "[]" ;
 separator Arg "," ;
 
 ValArrSize.      ArrSize ::= "[" Exp "]" ;
-EmptyArrSize.    ArrSize ::= "[]" ;
+EmptyArrSize.    ArrSize ::= "[""]" ;
 
 separator nonempty ArrSize "" ;
 
-Function. Func ::= Ident "(" [Arg] ")" Block ;
+FunctionNoParams. Func ::=  Ident "(" ")" Block;
+FunctionParams. Func ::=  Ident "(" [Arg] ")" Block;
+
 -- Struct.   Struct ::= "struct" Ident "{" [Arg] "}" ;
 
 InitExpr.    Initializer ::= Exp2 ;
@@ -67,20 +69,20 @@ EmptyStm.  Stm ::= ";" ;
 -- DecStm. Stm ::= Dec ;
 SelectStm. Stm ::= SelectionStm ;
 ItStm.     Stm ::= IterStm ;
-JStm.      Stm ::= JumpStm ;
+RStm.      Stm ::= ReturnStm ;
 PrintStm.  Stm ::= "print" "(" Exp ")" ";" ;
 
 IfStm.        SelectionStm ::= "if" "(" Exp ")" Instruction ;
 IfElseStm.    SelectionStm ::= "if" "(" Exp ")" Instruction "else" Instruction ;
 
-WhileStm.   IterStm ::= "while" "(" Exp ")" Instruction;
-ForStm1.    IterStm ::= "for" "(" Stm Exp ")" Instruction ;
-ForStm2.    IterStm ::= "for" "(" Stm Exp Stm ")" Instruction;
+WhileStm.     IterStm ::= "while" "(" Exp ")" Instruction;
+ForStm.       IterStm ::= "for" "(" Exp ";" Exp ")" Instruction;
+ForStmPrecond. IterStm ::= "for" "(" Exp ";" Exp ";" Exp ")" Instruction;
 
-ContStm.   JumpStm ::= "continue" ";" ;
-BreakStm.  JumpStm ::= "break" ";" ;
-RetStm.    JumpStm ::= "return" ";" ;
-RetExpStm. JumpStm ::= "return" Exp ";" ;
+ContStm.   ReturnStm ::= "continue" ";" ;
+BreakStm.  ReturnStm ::= "break" ";" ;
+RetStm.    ReturnStm ::= "return" ";" ;
+RetExpStm. ReturnStm ::= "return" Exp ";" ;
 
 separator Stm "" ;
 
@@ -119,8 +121,8 @@ coercions Exp 20 ;
 separator Exp "," ;
 
 -- Operators
-Address.     UnaryOp ::= "&" ;
-Indirection. UnaryOp ::= "*" ;
+--Address.     UnaryOp ::= "&" ;
+--Indirection. UnaryOp ::= "*" ;
 UnaryPlus.   UnaryOp ::= "+" ;
 Negative.    UnaryOp ::= "-" ;
 Logicalneg.  UnaryOp ::= "!" ;

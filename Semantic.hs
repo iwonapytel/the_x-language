@@ -16,7 +16,6 @@ import StateEnv
 import Expressions
 
 
--- todo tutaj zrób jumpy
 semInstructions :: [Instruction] -> Semantics (Env, Ret)
 semInstructions (x:xs) = do
   traceShowM x
@@ -44,12 +43,16 @@ semInstruction i = do
       traceShowM val
       return (env, None)
     BlockInstruction b -> do
-      case b of
-        BBlock i -> do
-          (env2, ret) <- semInstructions i
-          return (env, ret)
-        EmptyBlock -> return (env, None)
+      ret <- semBlock b
+      return (env, ret)
 
+semBlock :: Block -> Semantics Ret
+semBlock b = do
+  case b of
+    BBlock i -> do
+     (_, ret) <- semInstructions i
+     return ret
+    EmptyBlock -> return None
 
 -- Statements semantic
 semStatement :: Stm -> Semantics Ret
@@ -59,6 +62,27 @@ semStatement stm = case stm of
     SelectStm x -> case x of
       IfStm e i       -> semIfElseStm e i (StmInstruction EmptyStm)
       IfElseStm e i1 i2 -> semIfElseStm e i1 i2
+    ItStm x -> semItStm x
+    RStm x -> case x of
+      ContStm -> return Continue
+      BreakStm -> return Break
+      RetExpStm e -> do
+        val <- semExp e
+        return (Return val)
+
+semItStm :: IterStm -> Semantics Ret
+semItStm stm = do
+  case stm of
+    WhileStm e i -> semWhileStm e i
+    ForStmPrecond prefor cond postfor instr -> do
+      let postforInstr = (ExpInstruction postfor)
+      let newInstr = (BlockInstruction (BBlock [instr, postforInstr]))
+      _ <- semExp prefor
+      semWhileStm cond newInstr
+    ForStm cond postfor instr -> do
+      let postforInstr = (ExpInstruction postfor)
+      let newInstr = (BlockInstruction (BBlock [instr, postforInstr]))
+      semWhileStm cond newInstr
 
 semPrintStm :: Exp -> Semantics Ret
 semPrintStm expr = do
@@ -70,6 +94,7 @@ printVal :: Val -> Semantics ()
 printVal val = case val of
   (INT i)  -> liftIO (print i)
   (BOOL i) -> liftIO (print i)
+
 
 semIfElseStm :: Exp -> Instruction -> Instruction -> Semantics Ret
 semIfElseStm e i1 i2 = do
@@ -106,6 +131,7 @@ semDeclaration :: Dec -> Semantics Env
 semDeclaration dec = do
   case dec of
     VarDec typename item -> semVarDec typename item
+    FuncDec typename func -> semFunDec typename func
 
 semVarDec :: TypeName ->  Item -> Semantics Env
 semVarDec typename item = do
@@ -118,15 +144,14 @@ semVarDec typename item = do
       else
         varDecl ident val
     UninitedArr ident arrsize -> case arrsize of
-      ValArrSize det -> do
+      EmptyArrSize -> throwError "Unitialized array must be declared with size"
+      (ValArrSize det) -> do
         detVal <- semExp det
         case detVal of
           (INT i) -> do
-            let defaultVals = (replicate i (INT 0))
+            let defaultVals = (replicate i (defaultTypeValue typename))
             putArray ident detVal defaultVals
           _ -> throwError "Incompatible array size"
-      EmptyArrSize -> do
-        varDecl ident (ARR 0 Map.empty)
     InitedArr ident arrsize (Earray expr) -> do
       vals <- semMultipleVals expr
       _ <- checkArrVals typename vals
@@ -138,13 +163,14 @@ semVarDec typename item = do
           putArray ident (INT $ length vals) vals
 
 
+semFunDec :: TypeName -> Func -> Semantics Env
+semFunDec typename func = do
+  case func of
+    FunctionNoParams ident block ->
+      semFunDec typename (FunctionParams ident [] block )
+    FunctionParams ident args block ->
+      defineFun typename ident args (semBlock block)
 
--- replicate problem
---
-
-{-
-semFunDec :: Dec -> Semantics Env
--}
 
 -- main
 runProgram :: Program -> Semantics Env
@@ -157,4 +183,6 @@ runProgram program = do
 semProgram :: Program -> Semantics Env
 semProgram (Progr instructions) = do
   (env, ret) <- semInstructions instructions
-  return env
+  case ret of
+    None -> return env
+    _ -> throwError "Return statement, that doesn't match any loop or function"
