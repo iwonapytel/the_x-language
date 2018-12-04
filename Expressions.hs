@@ -60,11 +60,11 @@ semExp ex = do
 					 b <- semExp exp2
 				 	 return (BOOL (a == b))
 		(Eneq exp1 exp2) -> do
-				  BOOL a <- semExp (Eeq exp1 exp2)
-				  return (BOOL (not a))
+				  	BOOL a <- semExp (Eeq exp1 exp2)
+				  	return (BOOL (not a))
 		(Elthen exp1 exp2) -> do
-				 (INT a, INT b) <- semBinExp TInt exp1 exp2
-				 return (BOOL (a < b))
+				 	(INT a, INT b) <- semBinExp TInt exp1 exp2
+				 	return (BOOL (a < b))
 		(Egrthen exp1 exp2) -> do
 					(INT a, INT b) <- semBinExp TInt exp1 exp2
 					return (BOOL (a > b))
