@@ -35,8 +35,8 @@ semExp ex = do
 	case ex of
 		(ELitInt i)       -> return (INT (fromInteger i))
 		(ELitBool b)      -> case b of
-														ETrue ->  return (BOOL True)
-														EFalse -> return (BOOL False)
+					ETrue ->  return (BOOL True)
+					EFalse -> return (BOOL False)
 		(EVar ident)      -> getVarVal ident
 		(EArr ident expr) -> do
 					 val <- semExp expr
