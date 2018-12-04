@@ -7,3 +7,10 @@ Language supports:
   - if/else, while, for, print
   - multi-dimensional arrays
   - static type checker (for booleans, ints, arrays)
+  
+ Usage:
+  - make
+  - ./interpreter example
+ 
+Directories good/ and bad/: correct and incorrect examples of a language syntax.
+ 
